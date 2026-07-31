@@ -189,6 +189,7 @@ def load_share_links(text):
             decoded = text
     except Exception:
         decoded = text
+    decoded = decoded.replace("&amp;", "&")  # 部分源内容被 HTML 转义
     proxies = []
     for line in decoded.splitlines():
         line = line.strip()
@@ -481,6 +482,12 @@ def source_urls():
     return [
         ("freeSub", "clash",
          ["https://raw.githubusercontent.com/Ruk1ng001/freeSub/main/clash.yaml"]),
+        ("NoMoreWalls", "clash",
+         ["https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.meta.yml"]),
+        ("free18", "clash",
+         ["https://raw.githubusercontent.com/free18/v2ray/refs/heads/main/c.yaml"]),
+        ("ermaozi", "clash",
+         ["https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/clash.yml"]),
         ("clashfree", "clash",
          [f"https://raw.githubusercontent.com/free-nodes/clashfree/main/clash{d}.yml" for d in dates]),
         ("Eternity", "clash",
