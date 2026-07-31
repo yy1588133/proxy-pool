@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install pyyaml
+        run: pip install pyyaml maxminddb
 
       - name: Aggregate nodes
         run: python scripts/aggregate.py

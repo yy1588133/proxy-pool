@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 """proxy-pool 聚合器：抓取上游订阅 -> 解析去重 -> 输出 clash.yaml / v2ray.txt"""
 import base64
+import ipaddress
 import json
+import os
 import re
+import socket
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
 import yaml
@@ -314,6 +319,160 @@ def valid(p):
         return False
     return True
 
+# ---------- 国家识别 ----------
+
+CC_NAME = {
+    "HK": "香港", "TW": "台湾", "MO": "澳门", "JP": "日本", "SG": "新加坡", "KR": "韩国",
+    "US": "美国", "CA": "加拿大", "GB": "英国", "DE": "德国", "FR": "法国", "NL": "荷兰",
+    "RU": "俄罗斯", "IN": "印度", "TR": "土耳其", "TH": "泰国", "VN": "越南", "MY": "马来西亚",
+    "PH": "菲律宾", "ID": "印尼", "UA": "乌克兰", "GR": "希腊", "PL": "波兰", "NO": "挪威",
+    "SE": "瑞典", "FI": "芬兰", "RO": "罗马尼亚", "LV": "拉脱维亚", "LT": "立陶宛", "ES": "西班牙",
+    "IT": "意大利", "BR": "巴西", "AR": "阿根廷", "MX": "墨西哥", "CL": "智利", "EG": "埃及",
+    "ZA": "南非", "AE": "阿联酋", "SA": "沙特", "IL": "以色列", "IR": "伊朗", "PK": "巴基斯坦",
+    "KZ": "哈萨克斯坦", "CH": "瑞士", "AT": "奥地利", "BE": "比利时", "IE": "爱尔兰", "PT": "葡萄牙",
+    "CZ": "捷克", "HU": "匈牙利", "DK": "丹麦", "NZ": "新西兰", "AU": "澳大利亚", "IS": "冰岛",
+    "LU": "卢森堡", "EE": "爱沙尼亚", "BG": "保加利亚", "HR": "克罗地亚", "RS": "塞尔维亚",
+    "CO": "哥伦比亚", "PE": "秘鲁", "PA": "巴拿马", "UY": "乌拉圭", "VE": "委内瑞拉", "KH": "柬埔寨",
+    "MM": "缅甸", "NP": "尼泊尔", "BD": "孟加拉", "LK": "斯里兰卡", "MN": "蒙古", "LA": "老挝",
+    "MT": "马耳他", "CY": "塞浦路斯", "MD": "摩尔多瓦", "AM": "亚美尼亚", "AZ": "阿塞拜疆",
+    "GE": "格鲁吉亚", "BY": "白俄罗斯", "NG": "尼日利亚", "KE": "肯尼亚", "MA": "摩洛哥",
+    "QA": "卡塔尔", "KW": "科威特", "EC": "厄瓜多尔", "BO": "玻利维亚", "PY": "巴拉圭",
+    "CU": "古巴", "CN": "中国", "SC": "塞舌尔", "MU": "毛里求斯", "SK": "斯洛伐克",
+    "SI": "斯洛文尼亚", "MK": "北马其顿", "AL": "阿尔巴尼亚", "DZ": "阿尔及利亚",
+    "TN": "突尼斯", "IQ": "伊拉克", "JO": "约旦", "LB": "黎巴嫩", "BH": "巴林",
+    "OM": "阿曼", "UZ": "乌兹别克斯坦", "KG": "吉尔吉斯斯坦", "TJ": "塔吉克斯坦",
+    "TM": "土库曼斯坦", "BN": "文莱", "PR": "波多黎各", "DO": "多米尼加", "GT": "危地马拉",
+    "CR": "哥斯达黎加", "TT": "特立尼达和多巴哥", "IM": "马恩岛", "JE": "泽西岛",
+    "GG": "根西岛", "GI": "直布罗陀", "AD": "安道尔", "LI": "列支敦士登", "MC": "摩纳哥",
+    "SM": "圣马力诺", "VA": "梵蒂冈", "FO": "法罗群岛", "GL": "格陵兰", "PF": "法属波利尼西亚",
+}
+CN_TO_CC = {v: k for k, v in CC_NAME.items()}
+CN_TO_CC.update({"美國": "US", "台灣": "TW", "韓國": "KR", "俄羅斯": "RU", "英國": "GB",
+                 "德國": "DE", "法國": "FR", "澳洲": "AU", "荷蘭": "NL", "泰國": "TH",
+                 "馬來西亞": "MY", "菲律賓": "PH", "印度尼西亚": "ID", "烏克蘭": "UA",
+                 "希臘": "GR", "波蘭": "PL", "芬蘭": "FI", "羅馬尼亞": "RO", "阿聯酋": "AE",
+                 "新西蘭": "NZ", "澳門": "MO", "冰島": "IS", "盧森堡": "LU", "愛爾蘭": "IE",
+                 "比利时": "BE", "丹麥": "DK", "印度尼西亚": "ID", "哈薩克斯坦": "KZ"})
+_CN_KEYS = sorted(CN_TO_CC.keys(), key=len, reverse=True)
+
+FLAG_RE = re.compile(r"[\U0001F1E6-\U0001F1FF]{2}")
+PREFIX_RE = re.compile(r"^\[[^\]]*\]\s*")
+ISO_RE = re.compile(r"^([A-Z]{2})(?=[-_\s|])")
+
+def flag_of(cc):
+    return chr(0x1F1E6 + ord(cc[0]) - 65) + chr(0x1F1E6 + ord(cc[1]) - 65)
+
+def cc_from_flag(flag):
+    return chr(ord(flag[0]) - 0x1F1E6 + 65) + chr(ord(flag[1]) - 0x1F1E6 + 65)
+
+def detect_cc(name):
+    """从节点名识别国别：国旗 emoji > 中文国名 > 前缀 ISO 代码"""
+    s = PREFIX_RE.sub("", name)
+    m = FLAG_RE.search(s)
+    if m:
+        return cc_from_flag(m.group(0))
+    for zh in _CN_KEYS:
+        if zh in s:
+            return CN_TO_CC[zh]
+    m = ISO_RE.match(s)
+    if m and m.group(1) in CC_NAME:
+        return m.group(1)
+    return None
+
+# ---------- GeoIP 补识别 ----------
+
+GEOIP_URLS = [
+    "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb",
+    "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb",
+    "https://cdn.jsdelivr.net/gh/Loyalsoldier/geoip@release/GeoLite2-Country.mmdb",
+]
+
+def download_mmdb():
+    for u in GEOIP_URLS:
+        try:
+            req = urllib.request.Request(u, headers=UA)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = r.read()
+            if len(data) > 1_000_000:
+                fd, path = tempfile.mkstemp(suffix=".mmdb")
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
+                print(f"  GeoIP 库下载成功（{len(data)//1024//1024}MB）：{u}")
+                return path
+        except Exception as e:
+            print(f"  GeoIP 下载失败 {u}: {e}")
+    return None
+
+def _is_ip(host):
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+def _resolve(host):
+    try:
+        return socket.gethostbyname(host)
+    except Exception:
+        return None
+
+def enrich_cc(merged, country_of):
+    """对名称识别失败的节点，按服务器 IP 归属地补识别；任何一步失败都静默跳过"""
+    unknown = [p for p in merged if not country_of.get(p["name"])]
+    if not unknown:
+        return
+    try:
+        import maxminddb
+    except ImportError:
+        print("  maxminddb 未安装，跳过 GeoIP 补识别")
+        return
+    path = download_mmdb()
+    if not path:
+        return
+    try:
+        hosts = {p["server"] for p in unknown}
+        ip_of = {h: h for h in hosts if _is_ip(h)}
+        todo = [h for h in hosts if h not in ip_of]
+        with ThreadPoolExecutor(max_workers=48) as ex:
+            futs = {ex.submit(_resolve, h): h for h in todo}
+            try:
+                for fut in as_completed(futs, timeout=90):
+                    ip = fut.result()
+                    if ip:
+                        ip_of[futs[fut]] = ip
+            except Exception:
+                pass
+        fixed = 0
+        with maxminddb.open_database(path) as reader:
+            for p in unknown:
+                ip = ip_of.get(p["server"])
+                if not ip:
+                    continue
+                try:
+                    rec = reader.get(ip)
+                except Exception:
+                    continue
+                # mihomo metadb 返回值可能是小写字符串('kr')或列表(['us','google'])
+                if isinstance(rec, str):
+                    cc = rec
+                elif isinstance(rec, (list, tuple)) and rec:
+                    cc = str(rec[0])
+                elif isinstance(rec, dict):  # 标准 GeoLite2 格式
+                    cc = ((rec.get("country") or {}).get("iso_code")
+                          or (rec.get("registered_country") or {}).get("iso_code"))
+                else:
+                    cc = None
+                cc = cc.upper() if cc else None
+                if cc and re.fullmatch(r"[A-Z]{2}", cc):
+                    country_of[p["name"]] = cc
+                    fixed += 1
+        print(f"GeoIP 补识别成功: {fixed}/{len(unknown)}")
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
 # ---------- 主流程 ----------
 
 def source_urls():
@@ -361,6 +520,48 @@ def main():
     print(f"合计去重后节点: {len(merged)}")
 
     names = [p["name"] for p in merged]
+
+    # ---- 国家分组：名称识别 + GeoIP 补识别 ----
+    country_of = {p["name"]: detect_cc(p["name"]) for p in merged}
+    print(f"名称识别国别: {sum(1 for v in country_of.values() if v)}/{len(merged)}")
+    enrich_cc(merged, country_of)
+
+    buckets = {}
+    for p in merged:
+        buckets.setdefault(country_of[p["name"]], []).append(p["name"])
+    unknown_names = buckets.pop(None, [])
+
+    TEST_URL = "https://www.youtube.com/generate_204"
+    POPULAR = ["HK", "TW", "JP", "SG", "KR", "US"]
+    ordered = sorted(buckets.items(),
+                     key=lambda kv: (POPULAR.index(kv[0]) if kv[0] in POPULAR else 90, -len(kv[1])))
+
+    def ut(gname, ns):
+        return {"name": gname, "type": "url-test", "url": TEST_URL,
+                "interval": 300, "tolerance": 100, "lazy": True, "proxies": ns}
+
+    country_groups, tiny = [], []
+    for cc, ns in ordered:
+        if len(ns) < 3:
+            tiny.extend(ns)
+            continue
+        country_groups.append(ut(f"{flag_of(cc)} {CC_NAME.get(cc, cc)}·{len(ns)}", ns))
+    n_real_groups = len(country_groups)
+    if tiny:
+        country_groups.append(ut(f"🌍 其他·{len(tiny)}", tiny))
+    if unknown_names:
+        country_groups.append(ut(f"🏳️ 未标注·{len(unknown_names)}", unknown_names))
+
+    group_names = [g["name"] for g in country_groups]
+    groups = ([{"name": "🚀 节点选择", "type": "select",
+                "proxies": ["⚡ 自动最快"] + group_names + ["DIRECT"] + names},
+               ut("⚡ 自动最快", names)]
+              + country_groups)
+
+    top = sorted(buckets.items(), key=lambda kv: -len(kv[1]))[:10]
+    print(f"分组完成: {n_real_groups} 个国家组，其他 {len(tiny)}，未标注 {len(unknown_names)}")
+    print("国别 TOP10: " + ", ".join(f"{CC_NAME.get(cc, cc)}{len(ns)}" for cc, ns in top))
+
     clash = {
         "mixed-port": 7890,
         "allow-lan": True,
@@ -377,14 +578,7 @@ def main():
                                "*.msftncsi.com", "time.*.com", "*.stun.*.*"],
         },
         "proxies": merged,
-        "proxy-groups": [
-            {"name": "🚀 节点选择", "type": "select",
-             "proxies": ["⚡ 自动最快", "DIRECT"] + names},
-            {"name": "⚡ 自动最快", "type": "url-test",
-             "url": "https://www.youtube.com/generate_204",
-             "interval": 300, "tolerance": 100, "lazy": True,
-             "proxies": names},
-        ],
+        "proxy-groups": groups,
         "rules": [
             "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
             "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
