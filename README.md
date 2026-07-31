@@ -33,20 +33,22 @@ https://raw.githubusercontent.com/yy1588133/proxy-pool/main/v2ray.txt
 
 ## 上游源
 
-[freeSub](https://github.com/Ruk1ng001/freeSub) · [NoMoreWalls](https://github.com/peasoft/NoMoreWalls) · [free18](https://github.com/free18/v2ray) · [get_subscribe](https://github.com/ermaozi/get_subscribe) · [clashfree](https://github.com/free-nodes/clashfree) · [V2RayAggregator](https://github.com/mahdibland/V2RayAggregator) · [Free-servers](https://github.com/Pawdroid/Free-servers)
+[freeSub](https://github.com/Ruk1ng001/freeSub) · [NoMoreWalls](https://github.com/peasoft/NoMoreWalls) · [AutoMergePublicNodes](https://github.com/chengaopan/AutoMergePublicNodes) · [zhuhaiuk/free-nodes](https://github.com/zhuhaiuk/free-nodes) · [free18](https://github.com/free18/v2ray) · [get_subscribe](https://github.com/ermaozi/get_subscribe) · [clashfree](https://github.com/free-nodes/clashfree) · [V2RayAggregator](https://github.com/mahdibland/V2RayAggregator) · [Free-servers](https://github.com/Pawdroid/Free-servers)
 
-> 候选源均经过墙内真实环境抽样测活筛选；Epodonios、MhdiTaheri、Snapdragon、mfuu 等因服务器大面积被墙未收录
+> 候选源均经过墙内真实环境抽样测活筛选；Epodonios、MhdiTaheri、Alirewa、miladtahanian 等 Telegram 收集器因服务器大面积被墙未收录
 
 ## 当前统计
 
 <!--STATS-->
-更新于 **2026-07-31 15:21:50 北京时间**，共 **1430** 个去重节点
+更新于 **2026-07-31 15:31:14 北京时间**，共 **1451** 个去重节点
 
 | 上游源 | 节点数 |
 |---|---|
 | freeSub | 216 |
 | NoMoreWalls | 117 |
-| free18 | 140 |
+| AutoMerge | 15 |
+| zhuhaiuk | 15 |
+| free18 | 131 |
 | ermaozi | 9 |
 | clashfree | 779 |
 | Eternity | 158 |
