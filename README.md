@@ -19,8 +19,8 @@ https://raw.githubusercontent.com/yy1588133/proxy-pool/main/v2ray.txt
 ## Clash 版内置策略组
 
 - **🚀 节点选择**：总开关，可在下列各组之间切换，也可 DIRECT 直连或手动指定单个节点
-- **⚡ 自动最快**：包含**全部节点**的 url-test 组，每 5 分钟以 `youtube.com/generate_204` 测速并自动切换最快节点
-- **国家/地区组**：每个国家一个 url-test 组（如 `🇯🇵 日本·141`），只在该国节点内自动选最快；节点少于 3 个的国家归入 `🌍 其他`，无法识别归属的归入 `🏳️ 未标注`
+- **⚡ 自动最快**：包含**全部节点**的 url-test 组，每 5 分钟以 `youtube.com/generate_204` 测速并自动切换最快节点（大池子不宜高频测速）
+- **国家/地区组**：每个国家一个 url-test 组（如 `🇯🇵 日本·141`），只在该国节点内自动选最快；测速间隔差异化——节点 ≥100 的组每 2 分钟，<100 的组每 1 分钟；节点少于 3 个的国家归入 `🌍 其他`，无法识别归属的归入 `🏳️ 未标注`
 - 国别识别：优先解析节点名（国旗 emoji / 中文国名 / ISO 代码），识别失败的再用 GeoIP 按服务器 IP 归属地补识别
 
 分流规则：内网 IP 直连 → GEOIP CN 直连 → 其余走代理。
@@ -40,7 +40,7 @@ https://raw.githubusercontent.com/yy1588133/proxy-pool/main/v2ray.txt
 ## 当前统计
 
 <!--STATS-->
-更新于 **2026-07-31 15:32:47 北京时间**，共 **1451** 个去重节点
+更新于 **2026-07-31 15:59:15 北京时间**，共 **1443** 个去重节点
 
 | 上游源 | 节点数 |
 |---|---|
@@ -50,7 +50,7 @@ https://raw.githubusercontent.com/yy1588133/proxy-pool/main/v2ray.txt
 | zhuhaiuk | 15 |
 | free18 | 131 |
 | ermaozi | 9 |
-| clashfree | 779 |
+| clashfree | 771 |
 | Eternity | 158 |
 | Pawdroid | 11 |
 <!--/STATS-->

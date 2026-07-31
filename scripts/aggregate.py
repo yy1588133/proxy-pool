@@ -547,9 +547,12 @@ def main():
     ordered = sorted(buckets.items(),
                      key=lambda kv: (POPULAR.index(kv[0]) if kv[0] in POPULAR else 90, -len(kv[1])))
 
-    def ut(gname, ns):
+    def ut(gname, ns, interval=None):
+        # 差异化间隔：全局大组 300s 防测速滥用；小组更灵敏（>=100 节点 120s，否则 60s）
+        if interval is None:
+            interval = 120 if len(ns) >= 100 else 60
         return {"name": gname, "type": "url-test", "url": TEST_URL,
-                "interval": 300, "tolerance": 100, "lazy": True, "proxies": ns}
+                "interval": interval, "tolerance": 100, "lazy": True, "proxies": ns}
 
     country_groups, tiny = [], []
     for cc, ns in ordered:
@@ -566,7 +569,7 @@ def main():
     group_names = [g["name"] for g in country_groups]
     groups = ([{"name": "🚀 节点选择", "type": "select",
                 "proxies": ["⚡ 自动最快"] + group_names + ["DIRECT"] + names},
-               ut("⚡ 自动最快", names)]
+               ut("⚡ 自动最快", names, 300)]
               + country_groups)
 
     top = sorted(buckets.items(), key=lambda kv: -len(kv[1]))[:10]
