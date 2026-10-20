@@ -40,19 +40,19 @@ https://raw.githubusercontent.com/yy1588133/proxy-pool/main/v2ray.txt
 ## 当前统计
 
 <!--STATS-->
-更新于 **2026-10-21 01:17:30 北京时间**，共 **1331** 个去重节点
+更新于 **2026-10-21 05:42:23 北京时间**，共 **1354** 个去重节点
 
 | 上游源 | 节点数 |
 |---|---|
 | freeSub | 484 |
-| NoMoreWalls | 295 |
-| AutoMerge | 41 |
-| zhuhaiuk | 20 |
-| free18 | 248 |
-| ermaozi | 72 |
+| NoMoreWalls | 292 |
+| AutoMerge | 20 |
+| zhuhaiuk | 18 |
+| free18 | 255 |
+| ermaozi | 117 |
 | clashfree | 0 |
 | Eternity | 167 |
-| Pawdroid | 4 |
+| Pawdroid | 1 |
 <!--/STATS-->
 
 ## 声明
